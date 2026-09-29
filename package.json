@@ -1,0 +1,34 @@
+{
+  "name": "tree-sitter-pino",
+  "version": "0.1.0",
+  "description": "Pino grammar for tree-sitter",
+  "main": "bindings/node",
+  "types": "bindings/node",
+  "keywords": [
+    "parser",
+    "lexer",
+    "tree-sitter",
+    "pino"
+  ],
+  "author": "Edgar Vázquez García <OGShawnLee>",
+  "license": "MIT",
+  "dependencies": {
+    "node-addon-api": "^8.2.1"
+  },
+  "devDependencies": {
+    "tree-sitter-cli": "^0.24.4",
+    "prebuildify": "^6.0.1"
+  },
+  "peerDependencies": {
+    "tree-sitter": "^0.21.1"
+  },
+  "peerDependenciesMeta": {
+    "tree-sitter": {
+      "optional": true
+    }
+  },
+  "scripts": {
+    "build": "tree-sitter generate",
+    "test": "tree-sitter test"
+  }
+}
