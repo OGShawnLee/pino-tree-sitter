@@ -9,11 +9,7 @@ module.exports = grammar({
   word: ($) => $.identifier,
 
   conflicts: ($) => [
-    [$.type, $.identifier],
-    [$.primary_expression, $.type_identifier],
-    [$._statement, $.return_statement],
-    [$.match_expression, $.match_statement],
-    [$.parameter, $.identifier],
+    [$.primary_expression, $.argument_list],
   ],
 
   rules: {
@@ -32,7 +28,6 @@ module.exports = grammar({
         $.import_statement,
         $.for_statement,
         $.if_statement,
-        $.match_statement,
         $.return_statement,
         $.break_statement,
         $.continue_statement,
@@ -47,13 +42,15 @@ module.exports = grammar({
     module_declaration: ($) => seq("module", field("name", $.identifier)),
 
     import_statement: ($) =>
-      choice(
-        seq("import", field("module", $.identifier)),
-        seq(
-          "from",
-          field("module", $.identifier),
-          "import",
-          repeat1(field("item", $.identifier)),
+      prec.right(
+        choice(
+          seq("import", field("module", $.identifier)),
+          seq(
+            "from",
+            field("module", $.identifier),
+            "import",
+            repeat1(choice(field("item", $.identifier), ",")),
+          ),
         ),
       ),
 
@@ -182,11 +179,13 @@ module.exports = grammar({
       ),
 
     interface_method: ($) =>
-      seq(
-        "fn",
-        field("name", $.identifier),
-        field("parameters", $.parameter_list),
-        optional(field("return_type", $.type)),
+      prec.right(
+        seq(
+          "fn",
+          field("name", $.identifier),
+          field("parameters", $.parameter_list),
+          optional(field("return_type", $.type)),
+        ),
       ),
 
     // Enums: enum Color { Red Green Blue }
@@ -259,19 +258,21 @@ module.exports = grammar({
     // fn (int) -> int
     // fn (int, int) -> int
     function_type: ($) =>
-      seq(
-        "fn",
-        optional(
-          seq(
-            "(",
-            repeat(choice($.type, ",")),
-            ")"
-          )
-        ),
-        optional(
-          seq(
-            "->",
-            field("return_type", $.type)
+      prec.right(
+        seq(
+          "fn",
+          optional(
+            seq(
+              "(",
+              repeat(choice($.type, ",")),
+              ")"
+            )
+          ),
+          optional(
+            seq(
+              "->",
+              field("return_type", $.type)
+            )
           )
         )
       ),
@@ -292,7 +293,7 @@ module.exports = grammar({
 
     // if-then-else as an expression: val x = if a > 0 then 1 else 0
     if_expression: ($) =>
-      prec(
+      prec.right(
         1,
         seq(
           "if",
@@ -324,8 +325,8 @@ module.exports = grammar({
         field("body", $.block),
       ),
 
-    // Pattern Matching as a Statement: match value { when a { } else { } }
-    match_statement: ($) =>
+    // Pattern Matching (used both as expression and as statement)
+    match_expression: ($) =>
       seq(
         "match",
         field("value", $._expression),
@@ -335,46 +336,28 @@ module.exports = grammar({
         "}",
       ),
 
-    // Pattern Matching as an Expression: val x = match val { when 1 => "A" else => "B" }
-    match_expression: ($) =>
-      prec(
-        2,
-        seq(
-          "match",
-          field("value", $._expression),
-          "{",
-          repeat(choice($.match_case_expr, $.match_case)),
-          optional(choice($.match_else_expr, $.match_else)),
-          "}",
-        ),
-      ),
-
     match_case: ($) =>
       seq(
         "when",
         field("patterns", repeat1(choice($._expression, ","))),
-        field("body", $.block),
+        choice(
+          field("body", $.block),
+          seq(choice("=>", "->"), field("body_expr", $._expression)),
+        ),
       ),
 
-    match_case_expr: ($) =>
-      seq(
-        "when",
-        field("patterns", repeat1(choice($._expression, ","))),
-        choice("=>", "->"),
-        field("body", $._expression),
-      ),
-
-    match_else: ($) => seq("else", field("body", $.block)),
-
-    match_else_expr: ($) =>
+    match_else: ($) =>
       seq(
         "else",
-        choice(seq(choice("=>", "->"), field("body", $._expression)), field("body", $.block)),
+        choice(
+          field("body", $.block),
+          seq(choice("=>", "->"), field("body_expr", $._expression)),
+        ),
       ),
 
     yield_expression: ($) => seq("yield", $._expression),
 
-    return_statement: ($) => seq("return", optional($._expression)),
+    return_statement: ($) => prec.right(seq("return", optional($._expression))),
     break_statement: ($) => "break",
     continue_statement: ($) => "continue",
     assert_statement: ($) => seq("assert", $._expression),
@@ -398,7 +381,7 @@ module.exports = grammar({
       ),
 
     try_expression: ($) =>
-      prec.right(8, seq(field("expression", $._expression), "?")),
+      prec.left(9, seq(field("expression", $._expression), "?")),
 
     assignment_expression: ($) =>
       prec.right(
@@ -466,7 +449,6 @@ module.exports = grammar({
         $.string_literal,
         $.rune_literal,
         $.boolean_literal,
-        $.null_literal,
         $.tuple_literal,
         $.vector_literal,
         $.map_literal,
@@ -585,6 +567,5 @@ module.exports = grammar({
     rune_literal: ($) => seq("'", choice(/[^'\\]/, seq("\\", /./)), "'"),
 
     boolean_literal: ($) => choice("true", "false"),
-    // null_literal: $ => 'null'
   },
 });
